@@ -1,18 +1,36 @@
+import { prismaClient } from "@/app/lib/db";
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
 
 const handler = NextAuth({
   providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID ?? "",
-      clientSecret: process.env.GITHUB_SECRET ?? "",
-    }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     }),
   ],
+  callbacks: {
+    async signIn(params) {
+      try {
+        let existingUser = await prismaClient.user.findUnique({
+          where: { email: params.user.email ?? "" },
+        });
+
+        if (!existingUser) {
+          existingUser = await prismaClient.user.create({
+            data: {
+              email: params.user.email ?? "",
+              provider: "Google",
+            },
+          });
+        }
+        return true;
+      } catch (error) {
+        console.error("Error in sign-in callback:", error);
+        return false;
+      }
+    },
+  },
 });
 
 export { handler as GET, handler as POST };
